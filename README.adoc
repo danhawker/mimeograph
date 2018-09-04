@@ -18,6 +18,8 @@ All config is held in the `config.json` file. It's pretty simple, simply define 
 
 .Docker
 
+OPTIONAL: If you want to embed a sane config.json file within the docker image, Copy/Edit config.json.sample to config.json, and set with your requirements.
+
 Build the image...
 `$ docker build -t mimeograph .`
 
