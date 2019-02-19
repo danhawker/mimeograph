@@ -4,11 +4,11 @@
 #
 # Noun: A duplicating machine which produces copies from a stencil.
 #
-# Script to copy container images from a source to a 
+# Script to copy container images from a source to a
 # target container registry, using Skopeo.
 # Builds on Skopeo in that it provides a list of namespaces/images
-# that need to be copied. It also copies all found tags for each image. 
-# 
+# that need to be copied. It also copies all found tags for each image.
+#
 # Probably should have done this in Python. Hey ho.
 
 #set -x
@@ -17,7 +17,7 @@
 
 CONFIG="/config.json"
 if [ ! -f ${CONFIG} ]; then
-  CONFIG="./config.json" 
+  CONFIG="./config.json"
 fi
 
 # Upstream/Source Repo Vars
@@ -41,7 +41,7 @@ TARGETAPI=$(jq -r .TargetRepository.api ${CONFIG})
 # Login to target Registry Cluster to check Namespaces/Projects
 # Currently very Atomic/OCP targetted.
 registrylogin() {
-  
+
   LOGGEDIN=$(oc login --insecure-skip-tls-verify=true ${TARGETAPI} --token ${TARGETTOKEN})
   if [ $? -ne 0 ]
   then
@@ -75,7 +75,7 @@ get_images() {
   project=$1
 
   # creating an argument/variable in JQ so that I can use $PROJECT sanely
-  images=$(jq -r --arg p $project '.Projects[] | select(.name == $p) | .images | .[]' config.json) 
+  images=$(jq -r --arg p $project '.Projects[] | select(.name == $p) | .images | .[]' config.json)
   echo $images
 }
 
@@ -137,8 +137,11 @@ echo $PROJECT_LIST
 
 echo "Getting Image Lists..."
 for project in $PROJECT_LIST; do
-  echo "Verifying Project Name: ${project}..."
-  verify_project ${project}
+  if [ $TARGETTYPE == "atomic" ]
+  then
+    echo "Verifying Project Name: ${project}..."
+    verify_project ${project}
+  fi
   IMAGES=$(get_images ${project})
   for img in $IMAGES; do
     echo $img
