@@ -11,8 +11,6 @@
 #
 # Probably should have done this in Python. Hey ho.
 
-#set -x
-
 # Main Config file is in JSON.
 
 CONFIG="/config.json"
@@ -97,26 +95,26 @@ copy_image() {
 
   # Generate ARGS
   SRCARGS=""
-  if [ -z "$SRCTLS" ]
+  if [[ -v SRCTLS ]]
   then
     SRCARGS="--src-tls-verify=${SRCTLS} ${SRCSARGS}"
   fi
-  if [ -z "${SRCUNAME}" ]
+  if [[ -v SRCUNAME ]] && [[ -n $SRCUNAME ]]
   then
     SRCARGS="--src-creds=${SRCUNAME}:${SRCTOKEN} ${SRCARGS}"
   fi
   TARGETARGS=""
-  if [ -z "$TARGETTLS" ]
+  if [[ -v TARGETTLS ]]
   then
     TARGETARGS="--dest-tls-verify=${TARGETTLS} ${TARGETARGS}"
   fi
-  if [ -z "${TARGETUNAME}" ]
+  if [[ -v TARGETUNAME ]] && [[ -n $TARGETUNAME ]]
   then
     TARGETARGS="--dest-creds=${TARGETUNAME}:${TARGETTOKEN} ${TARGETARGS}"
   fi
 
-echo "SourceArgs: ${SRCARGS}"
-echo "TargetArgs: ${TARGETARGS}"
+  #echo "SourceArgs: ${SRCARGS}"
+  #echo "TargetArgs: ${TARGETARGS}"
 
   echo "Copying ${sourceimage} to ${targetimage}..."
   skopeo copy ${SRCARGS} ${TARGETARGS} ${sourceimage} ${targetimage}
@@ -149,7 +147,7 @@ for project in $PROJECT_LIST; do
     for tag in ${TAGS}; do
       echo "Creating source container image path: docker://${SRCREPO}:${SRCPORT}/${project}/${img}:${tag}"
       echo "Target path: docker://${TARGETREPO}:${TARGETPORT}/${project}/${img}:${tag}"
-      #copy_image docker://${SRCREPO}:${TARGETPORT}/${project}/${img}:${tag} docker://${TARGETREPO}:${TARGETPORT}/${project}/${img}:${tag}
+      copy_image docker://${SRCREPO}:${SRCPORT}/${project}/${img}:${tag} docker://${TARGETREPO}:${TARGETPORT}/${project}/${img}:${tag}
     done
   done
   echo
