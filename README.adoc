@@ -4,9 +4,9 @@ Noun: A duplicating machine which produces copies from a stencil.
 
 Mimeograph is a simple script to enable the copying of container images from one source container registry (such as docker.io) to another target container registry. Under the covers, it leverages link:https://stedolan.github.io/jq[JQ] to parse JSON metadata from the source repository, and link:https://github.com/containers/skopeo[Skopeo] to copy the container image and any associated tags. The only addition above and beyond what Skopeo provides, is simply in the ability to read in a file of containers to copy and itterate over them. Like I said, simple. Useful for syncing containers between repositories in differing environments.
 
-It's currently heavily targeted towards OpenShift and the Atomic Enterprise Registry (because thats what I currently use), but may get around to extend to target other registries such as Quay.io.  
+It was originally heavily targeted towards OpenShift and the Atomic Enterprise Registry (because thats what I mainly and still often use), but has been extended somewhat to reliably target Quay. Other repositories ought to be easy to integrate.   
 
-If honest, should have done it in Python from the start, so will probably port it to that at some stage. Or maybe Go, since Skopeo uses that.
+If honest, I should have done it in Python from the start, so will probably port it to that at some stage. Or maybe Go, since Skopeo uses that.
 
 === Usage
 As it's a simple BASH script, you can simply clone this repo and run it directly from the terminal. There is also a Dockerfile too if thats how you want to run it. The Dockerfile leverages the lightweight rhel-atomic image, but should be easy to adapt to whatever you find easiest.
