@@ -1,0 +1,85 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mimeograph
+  namespace: mimeograph
+spec:
+  schedule: "10 3,15 * * *"
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            cron-job: mimeograph
+        spec:
+#          nodeSelector:
+#            node-role.kubernetes.io/infra: ''
+          serviceAccountName: mimeograph
+          containers:
+          - name: mimeograph
+            image: quay.io/danhawker/mimeograph:latest
+            imagePullPolicy: Always
+            command:
+                - /bin/sh
+                - '-c'
+                - >-
+                  /usr/local/bin/mimeograph.sh
+            resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: AWS_ACCESS_KEY_ID
+                  name: mimeograph-bucket
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: AWS_SECRET_ACCESS_KEY
+                  name: mimeograph-bucket
+            volumeMounts:
+              - mountPath: /mimeograph/mimeograph-config.yaml
+                name: mimeograph-config
+                readOnly: true
+                subPath: mimeograph-config.yaml
+              - name: mimeograph-imageset
+                mountPath: /mimeograph/mimeograph-imageset.yaml
+                readOnly: true
+                subPath: mimeograph-imageset.yaml
+              - name: mimeograph-metadata
+                mountPath: /mimeograph/metadata
+              - name: mimeograph-bundle
+                mountPath: /mimeograph/bundle
+              - name: mirror-auth-json
+                mountPath: /root/.docker/config.json
+                readOnly: true
+                subPath: mirror-auth.json
+          volumes:
+            - name: mimeograph-metadata
+              persistentVolumeClaim:
+                claimName: mimeograph-metadata
+            - name: mimeograph-bundle
+              persistentVolumeClaim:
+                claimName: mimeograph-bundle
+            - name: mirror-auth-json
+              configMap:
+                name: mirror-auth-json
+                items:
+                  - key: mirror-auth.json
+                    path: mirror-auth.json
+            - name: mimeograph-config
+              configMap:
+                name: mimeograph-config
+                items:
+                  - key: mimeograph-config.yaml
+                    path: mimeograph-config.yaml
+            - name: mimeograph-imageset
+              configMap:
+                name: mimeograph-imageset
+                items:
+                  - key: mimeograph-imageset.yaml
+                    path: mimeograph-imageset.yaml
+          restartPolicy: OnFailure

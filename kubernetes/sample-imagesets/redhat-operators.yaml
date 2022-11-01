@@ -1,0 +1,18 @@
+apiVersion: mirror.openshift.io/v1alpha2
+kind: ImageSetConfiguration
+archiveSize: 2
+mirror:
+  operators:
+    - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.10  
+      packages:
+      - name: rhsso-operator
+        minVersion: 7.6.0-opr-003 
+        channels: 
+        - name: stable
+      - name: openshift-gitops-operator 
+        minVersion: 1.6.1
+        channels:
+        - name: latest
+storageConfig:
+  local:
+    path: /mimeograph/metadata

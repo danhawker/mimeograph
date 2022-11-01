@@ -1,0 +1,8 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: mimeograph-bucket
+  namespace: mimeograph
+spec:
+  generateBucketName: mimeograph-bucket
+  storageClassName: openshift-storage.noobaa.io

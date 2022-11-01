@@ -5,152 +5,161 @@
 # Noun: A duplicating machine which produces copies from a stencil.
 #
 # Script to copy container images from a source to a
-# target container registry, using Skopeo.
-# Builds on Skopeo in that it provides a list of namespaces/images
-# that need to be copied. It also copies all found tags for each image.
+# target container registry, using oc-mirror.
 #
-# Probably should have done this in Python. Hey ho.
+# Builds on oc-mirror by uploading the resulting tar files
+# to an S3 style object bucket.
+#
 
-# Main Config file is in JSON.
+set -x
 
-CONFIG="/config.json"
-if [ ! -f ${CONFIG} ]; then
-  CONFIG="./config.json"
+# Main Config file is in YAML
+MIMEOGRAPH_CONFIG="/mimeograph/mimeograph-config.yaml"
+if [ ! -f ${MIMEOGRAPH_CONFIG} ]; then
+  MIMEOGRAPH_CONFIG="./mimeograph-config.yaml"
 fi
 
-# Upstream/Source Repo Vars
-SRCREPO=$(jq -r .UpstreamRepository.uri ${CONFIG})
-SRCPORT=$(jq -r .UpstreamRepository.port ${CONFIG})
-SRCTLS=$(jq -r .UpstreamRepository.tlsverify ${CONFIG})
-SRCUNAME=$(jq -r .UpstreamRepository.username ${CONFIG})
-SRCTOKEN=$(jq -r .UpstreamRepository.token ${CONFIG})
+echo "Linking auth secret to registry..."
+# $HOME is set to /root in our container, so create /root/.docker
+#mkdir -p /root/.docker
 
-# Target Repo Vars
-TARGETREPO=$(jq -r .TargetRepository.uri ${CONFIG})
-TARGETPORT=$(jq -r .TargetRepository.port ${CONFIG})
-TARGETTYPE=$(jq -r .TargetRepository.type ${CONFIG})
-TARGETTLS=$(jq -r .TargetRepository.tlsverify ${CONFIG})
-TARGETUNAME=$(jq -r .TargetRepository.username ${CONFIG})
-TARGETTOKEN=$(jq -r .TargetRepository.token ${CONFIG})
-# OpenShift API
-TARGETAPI=$(jq -r .TargetRepository.api ${CONFIG})
+REGISTRY_AUTH="/root/.docker/config.json"
+#REGISTRY_AUTH="~/.docker/config.json"
 
+if [ ! -f ${REGISTRY_AUTH} ]; then
+  echo "Required Registry Authentication file not found at ${REGISTRY_AUTH}"
+  echo "Please check external file is mounted correctly"
+  exit 1
+fi
 
-# Login to target Registry Cluster to check Namespaces/Projects
-# Currently very Atomic/OCP targetted.
-registrylogin() {
+# Extract Operational Mode (bundle or populate)
+MODE=$(yq .operation ${MIMEOGRAPH_CONFIG})
+echo "Operational Mode: ${MODE}"
+# Extract the bucket name
+BUCKET_NAME=$(yq .s3.bucket.name ${MIMEOGRAPH_CONFIG})
+echo "BUCKET_NAME: ${BUCKET_NAME}"
+# Extract the bucket subDir
+BUCKET_SUBDIR=$(yq .s3.bucket.subDir ${MIMEOGRAPH_CONFIG})
+echo "BUCKET_SUBDIR: ${BUCKET_SUBDIR}"
+# Extract Bucket Endpoint
+BUCKET_ENDPOINT=$(yq .s3.bucket.endpoint ${MIMEOGRAPH_CONFIG})
+echo "BUCKET_ENDPOINT: ${BUCKET_ENDPOINT}"
+# Extract the bundle dir
+BUNDLE_DIR=$(yq .artefacts.bundleDir ${MIMEOGRAPH_CONFIG})
+echo "BUNDLE_DIR: ${BUNDLE_DIR}"
+# Extract metadata dir
+METADATA_DIR=$(yq .artefacts.metadataDir ${MIMEOGRAPH_CONFIG})
+echo "METADATA_DIR: ${METADATA_DIR}"
+# extract imageset config
+MIRROR_CONFIG=$(yq .mirror.imagesetConfig ${MIMEOGRAPH_CONFIG})
+echo "MIRROR_CONFIG: ${MIRROR_CONFIG}"
+# extract Target Registry
+TARGET_REGISTRY_URI=$(yq .mirror.targetRegistryURI ${MIMEOGRAPH_CONFIG})
+echo "TARGET_REGISTRY_URI: ${TARGET_REGISTRY_IRI}"
 
-  LOGGEDIN=$(oc login --insecure-skip-tls-verify=true ${TARGETAPI} --token ${TARGETTOKEN})
-  if [ $? -ne 0 ]
-  then
-    echo "Could not login to Registry - exiting"
-    exit 1
-  fi
+# Create AWS_ARGS
+if [[ "${BUCKET_ENDPOINT}" == null ]]; then
+  echo "No endpoint defined, assuming AWS..."
+  AWS_ARGS=""
+else
+  echo "Endpoint defined, configuring..."
+  AWS_ARGS="--endpoint ${BUCKET_ENDPOINT}"
+fi
+
+# Verify S3 Object Credentials
+verifyS3Creds() {
+    echo "Verifying S3 ENV VARS are set..."
+    if [[ -z ${AWS_ACCESS_KEY_ID} ]]; then
+        echo "Required Environment Variable AWS_ACCESS_KEY is not set"
+        echo "Please check ENV VAR is set correctly"
+        echo "Mimeograph Cannot Continue, exiting..."
+        exit 1
+    fi
+    if [[ -z ${AWS_SECRET_ACCESS_KEY} ]]; then
+        echo "Required Environment Variable AWS_SECRET_ACCESS_KEY is not set"
+        echo "Please check ENV VAR is set correctly"
+        echo "Mimeograph Cannot Continue, exiting..."
+        exit 1
+    fi
+    S3_CONFIG=true
 }
 
-# Get list of projects
-PROJECT_LIST=$(jq -r .Projects[].name ${CONFIG})
+bundle() {
+    echo "Entering Bundle function"
+    echo "Checking for Configuration files..."
+    if [ ! -f ${MIRROR_CONFIG} ]; then
+      echo "ERROR: mirror config ${MIRROR_CONFIG} not found"
+      echo "Please check mirror config is mounted to the container correctly"
+      exit 1
+    else
+      echo "Success"
+    fi
 
-# Verify Projects Exist
-# When pushing to OCP/Atomic registry, Skopeo needs the target repo to have
-# the correct namespaces/projects available.
-verify_project() {
+    echo "Attempting mirror and bundle..."
+    # oc-mirror --config imageset-config-minimal.yaml file:///home/ec2-user/mimeograph/archives
+    oc-mirror --config ${MIRROR_CONFIG} file://${BUNDLE_DIR}
+}
 
-  project=$1
-  PROJECT_EXIST=$(oc project ${project})
-  if [ $? -eq 0 ]
-  then
-    echo "Project ${project} already exists"
-  else
-    echo "Creating Project ${project}"
-    oc new-project ${project}
-  fi
+populate() {
+    echo "Entering Populate function"
+    echo "Checking for Relevant Configuration..."
+    if [ ! -f ${MIRROR_CONFIG} ]; then
+      echo "ERROR: mirror config ${MIRROR_CONFIG} not found"
+      echo "Please check mirror config is mounted to the container correctly"
+      exit 1
+    else
+      echo "Success"
+    fi
+
+    echo "Attempting Unbundle and Populate..."
+    # oc-mirror --from /mimeograph/bundle docker://disconnected-registry.example.com
+    oc-mirror --from ${BUNDLE_DIR} --dir ${BUNDLE_DIR}/oc-mirror-workspace docker://${TARGET_REGISTRY_URI}
 
 }
 
-# Get list of images within a project
-get_images() {
-  project=$1
-
-  # creating an argument/variable in JQ so that I can use $PROJECT sanely
-  images=$(jq -r --arg p $project '.Projects[] | select(.name == $p) | .images | .[]' config.json)
-  echo $images
-}
-
-
-# Get list of available tags from upstream repo
-get_tags() {
-  image_name=$1
-  project=$2
-  repo=$3
-
-  tags=$(skopeo inspect --tls-verify=${SRCTLS} docker://${repo}/${project}/${image_name} | jq .RepoTags | jq -r '.[]')
-  echo $tags
-}
-
-# Copy each image/tag to target
-copy_image() {
-  sourceimage=$1
-  targetimage=$2
-
-  # Generate ARGS
-  SRCARGS=""
-  if [[ -v SRCTLS ]]
-  then
-    SRCARGS="--src-tls-verify=${SRCTLS} ${SRCSARGS}"
-  fi
-  if [[ -v SRCUNAME ]] && [[ -n $SRCUNAME ]]
-  then
-    SRCARGS="--src-creds=${SRCUNAME}:${SRCTOKEN} ${SRCARGS}"
-  fi
-  TARGETARGS=""
-  if [[ -v TARGETTLS ]]
-  then
-    TARGETARGS="--dest-tls-verify=${TARGETTLS} ${TARGETARGS}"
-  fi
-  if [[ -v TARGETUNAME ]] && [[ -n $TARGETUNAME ]]
-  then
-    TARGETARGS="--dest-creds=${TARGETUNAME}:${TARGETTOKEN} ${TARGETARGS}"
-  fi
-
-  #echo "SourceArgs: ${SRCARGS}"
-  #echo "TargetArgs: ${TARGETARGS}"
-
-  echo "Copying ${sourceimage} to ${targetimage}..."
-  skopeo copy ${SRCARGS} ${TARGETARGS} ${sourceimage} ${targetimage}
+s3sync() {
+    source=$1
+    dest=$2
+    subdir=$3
+    echo "Checking S3..."
+    if [[ ${S3_CONFIG} == false ]]; then
+        echo "Error: S3 Config (S3_CONFIG) is not set"
+        echo "Mimeograph Cannot Sync to S3, exiting..."
+        exit 1
+    fi
+    echo "Syncing Artefacts to S3..."
+    aws ${AWS_ARGS} s3 sync --exclude "*" --include "*.tar" $source $dest
 
 }
 
 # Script Starts Here in Anger
 
-# If Target needs login to create namespaces/project
-# eg Atomic or OCP Registry - Login to target registry (OCP based)
-if [ ${TARGETTYPE} == "atomic" ]
-then
-  registrylogin
+echo "Welcome to Mimeograph"
+
+echo "Configuration File Path: ${MIRROR_CONFIG}"
+echo "Verifying Configuration..."
+# Verify S3 creds are available to sync to S3
+verifyS3Creds
+
+echo "Mimeograph Operational Mode: ${MODE}"
+
+if [[ "${MODE}" == "bundle" ]]; then
+  echo "Copying and Bundling defined artefacts..."
+  # Run bundle...
+  bundle "${MIRROR_CONFIG}"
+
+  # Sync bundle artefacts to S3 bucket
+  s3sync ${BUNDLE_DIR} "s3://${BUCKET_NAME}/${BUCKET_SUBDIR}"
+
+elif [[ "${MODE}" == "populate" ]]; then
+  echo "Extracting bundle and populating target Registry with bundled artefacts..."
+  # Sync bundle artefacts from S3 bucket
+  s3sync "s3://${BUCKET_NAME}/${BUCKET_SUBDIR}" ${BUNDLE_DIR}
+
+  # Run populate...
+  populate
+
 fi
 
-echo "Discovering Projects..."
-echo $PROJECT_LIST
-
-echo "Getting Image Lists..."
-for project in $PROJECT_LIST; do
-  if [ $TARGETTYPE == "atomic" ]
-  then
-    echo "Verifying Project Name: ${project}..."
-    verify_project ${project}
-  fi
-  IMAGES=$(get_images ${project})
-  for img in $IMAGES; do
-    echo $img
-    TAGS=$(get_tags $img $project ${SRCREPO}:${SRCPORT})
-    for tag in ${TAGS}; do
-      echo "Creating source container image path: docker://${SRCREPO}:${SRCPORT}/${project}/${img}:${tag}"
-      echo "Target path: docker://${TARGETREPO}:${TARGETPORT}/${project}/${img}:${tag}"
-      copy_image docker://${SRCREPO}:${SRCPORT}/${project}/${img}:${tag} docker://${TARGETREPO}:${TARGETPORT}/${project}/${img}:${tag}
-    done
-  done
-  echo
-done
-
+#exec "$@"
 # EOF

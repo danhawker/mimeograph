@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mimeograph
+  annotations:
+    openshift.io/display-name: 'Mimeograph'
+    openshift.io/description: "A duplicating machine which produces copies from a stencil.\n Mimeograph automates the copying of containers, operators and helm charts for upload to disconnected environments"

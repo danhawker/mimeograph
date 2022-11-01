@@ -1,0 +1,42 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+# Object bucket claim will auto-create the secret containing creds
+# that mimeograph needs to access object storage
+
+configMapGenerator:
+  - name: mimeograph-config
+    namespace: mimeograph
+    files:
+    - mimeograph-config.yaml
+  - name: mimeograph-imageset
+    namespace: mimeograph
+    files:
+    - mimeograph-imageset.yaml
+  - name: mirror-auth-json
+    namespace: mimeograph
+    files:
+    - mirror-auth.json
+
+resources:
+  - mimeograph-bucket-claim.yaml
+
+patchesJson6902:
+  - target:
+      group: ''
+      version: v1
+      kind: PersistentVolumeClaim
+      name: mimeograph-bundle
+      namespace: mimeograph
+    path: patch-bundle-pvc.yaml
+  - target:
+      group: ''
+      version: v1
+      kind: PersistentVolumeClaim
+      name: mimeograph-metadata
+      namespace: mimeograph
+    path: patch-metadata-pvc.yaml
