@@ -1,0 +1,14 @@
+apiVersion: mirror.openshift.io/v1alpha2
+kind: ImageSetConfiguration
+archiveSize: 4
+mirror:
+ additionalImages:
+   - name: registry.redhat.io/ubi8/ubi:latest
+   - name: registry.redhat.io/ubi8/ubi-minimal:latest
+   - name: registry.redhat.io/ubi7/ubi:latest
+storageConfig:
+ local:
+   path: /mimeograph/metadata
+ registry:
+   imageURL: quay.io/danhawker/mimeograph
+   skipTLS: true

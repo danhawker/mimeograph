@@ -1,0 +1,21 @@
+apiVersion: mirror.openshift.io/v1alpha2
+kind: ImageSetConfiguration
+archiveSize: 4
+mirror:
+  additionalImages:
+    - name: registry.redhat.io/ubi8/ubi:latest
+    - name: registry.redhat.io/ubi8/ubi-minimal:latest
+    - name: registry.redhat.io/ubi7/ubi:latest
+  operators:
+    - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.10  
+      packages:
+      - name: rhsso-operator
+        minVersion: 7.6.0-opr-003 
+        channels: 
+        - name: stable
+storageConfig:
+ local:
+   path: /mimeograph/metadata
+ registry:
+   imageURL: disconnected.registry.example.com/mimeograph
+   skipTLS: true

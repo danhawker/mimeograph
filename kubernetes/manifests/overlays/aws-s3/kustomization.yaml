@@ -1,0 +1,48 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+generatorOptions:
+ disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: mimeograph-config
+    namespace: mimeograph
+    files:
+    - mimeograph-config.yaml
+  - name: mimeograph-imageset
+    namespace: mimeograph
+    files:
+    - mimeograph-imageset.yaml
+  - name: mirror-auth-json
+    namespace: mimeograph
+    files:
+    - mirror-auth.json
+
+# Create Secret to hold S3 credentials either manually
+# or via the secretGenerator as below
+secretGenerator:
+  - name: mimeograph-bucket
+    literals:
+      - AWS_ACCESS_KEY_ID=AAABBBCCCXXXXXXXXXXXXXXX
+      - AWS_SECRET_ACCESS_KEY=aAbBcCdDXXXXXXXXXXXXXXX
+
+# Patch the StorageClass name for AWS (gp2)
+patchesJson6902:
+  - target:
+      group: ''
+      version: v1
+      kind: PersistentVolumeClaim
+      name: mimeograph-bundle
+      namespace: mimeograph
+    path: patch-bundle-pvc.yaml
+  - target:
+      group: ''
+      version: v1
+      kind: PersistentVolumeClaim
+      name: mimeograph-metadata
+      namespace: mimeograph
+    path: patch-metadata-pvc.yaml

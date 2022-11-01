@@ -1,0 +1,12 @@
+apiVersion: mimeograph.io/v1alpha1
+kind: MimeographConfiguration
+operation: bundle
+mirror:
+  imagesetConfig: /mimeograph/mimeograph-imageset.yaml
+  targetRegistryURI: quay.io/username/
+s3:
+  bucket:
+    name: mimeograph-bucket
+artefacts:
+  bundleDir: /mimeograph/bundle
+  metadataDir: /mimeograph/metadata

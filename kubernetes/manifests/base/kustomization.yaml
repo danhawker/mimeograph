@@ -1,0 +1,14 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+generatorOptions:
+ disableNameSuffixHash: true
+
+resources:
+  - mimeograph-namespace.yaml
+  - mimeograph-metadata-pvc.yaml
+  - mimeograph-bundle-pvc.yaml
+  - mimeograph-serviceaccount.yaml
+  - mimeograph-rolebinding.yaml
+  - mimeograph-cronjob.yaml
