@@ -26,6 +26,7 @@ configMapGenerator:
 # or via the secretGenerator as below
 secretGenerator:
   - name: mimeograph-bucket
+    namespace: mimeograph
     literals:
       - AWS_ACCESS_KEY_ID=AAABBBCCCXXXXXXXXXXXXXXX
       - AWS_SECRET_ACCESS_KEY=aAbBcCdDXXXXXXXXXXXXXXX

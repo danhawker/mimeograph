@@ -6,7 +6,7 @@ Once setup, Mimeograph runs as a simple k8s CronJob. Depending on configuration,
 
 ### Super Simple and Contrived Example
 
-![Mimeograph on Kubernetes](https://github.com/danhawker/mimeograph/assets/mimeograph-k8s.png  "Mimeograph on Kubernetes")
+![Mimeograph on Kubernetes](../assets/mimeograph-k8s.png  "Mimeograph on Kubernetes")
 
 1) Mimeograph 'bundle' job mirrors artefacts from upstream repositories
 2) Mimeograph pushes bundled archive files to S3 bucket storage
@@ -16,10 +16,20 @@ Once setup, Mimeograph runs as a simple k8s CronJob. Depending on configuration,
 6) Mimeograph 'populate' job, uploads mirrored artefacts to on-prem Container Registry
 
 ### Kustomize Manifests
-A series of Kustomise manifests are provided, these...
+A series of Kustomise manifests are provided.
 
-#### Baseline
-The initial baseline creates any core resources.
+Overlays are included which provision various elements (secrets, configmaps, persistent volumes, etc) for differing environments.
+
+If using OpenShift and ODF, an Object Bucket and secret containing access credentials is automatically created for you. If using another S3 provider (eg AWS) you will need to adjust the Kustomization file to either include a secretGenerator or create a secret containing the creds to access directly.
+
+Ensure you provide a valid `mirror-auth.json` file to consume here. This may need to include credentials for both the registry you pull from (eg `registry.redhat.io`) and the registry you will push to (eg `disconnected.registry.example.com`)
+
+If mirroring Red Hat content for OpenShift, a pull-secret will be required. Retrieve yours from `console.redhat.com`
+
+A default `mimeograph-config.yaml` and sample `mimeograph-imageset.yaml` file is included in each overlay. Adjust to suit your needs.
+
+#### Base
+The initial base creates core resources.
 
 * Create a namespace (mimeograph)
 * Create a ServiceAccount (mimeograph) and RoleBinding
@@ -49,6 +59,8 @@ OpenShift Data Foundation provides an `ObjectBucketClaim` resource which acts si
 When using an OBC, there is no need to create a Secret to contain the S3 credentials. A Secret which contains these credentials is automatically created by the ODF Operator upon creation, which Mimeograph can consume. 
 
 ### Usage
+
+Depending on the target, you may need to adjust the defaults, or create an additional overlay for your environment. Review the sample overlays for inspiration.
 
 * Ensure you have sufficient privileges within k8s/OpenShift to create all the needed resources
 * Adjust an existing overlay as a starter or copy and use as a template. 

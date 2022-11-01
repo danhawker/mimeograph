@@ -3,10 +3,12 @@ kind: MimeographConfiguration
 operation: bundle
 mirror:
   imagesetConfig: /mimeograph/mimeograph-imageset.yaml
-  targetRegistryURI: quay.io/username/
+  targetRegistryURI: disconnected.registry.example.com/mimeograph
 s3:
   bucket:
     name: mimeograph-bucket
+    endpoint: https://s3-openshift-storage.apps.ocp.example.com/
+    subDir: container-images
 artefacts:
   bundleDir: /mimeograph/bundle
   metadataDir: /mimeograph/metadata

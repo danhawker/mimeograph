@@ -58,7 +58,13 @@ TARGET_REGISTRY_URI=$(yq .mirror.targetRegistryURI ${MIMEOGRAPH_CONFIG})
 echo "TARGET_REGISTRY_URI: ${TARGET_REGISTRY_IRI}"
 
 # Create AWS_ARGS
-AWS_ARGS="--endpoint ${BUCKET_ENDPOINT}"
+if [[ "${BUCKET_ENDPOINT}" == null ]]; then
+  echo "No endpoint defined, assuming AWS..."
+  AWS_ARGS=""
+else
+  echo "Endpoint defined, configuring..."
+  AWS_ARGS="--endpoint ${BUCKET_ENDPOINT}"
+fi
 
 # Verify S3 Object Credentials
 verifyS3Creds() {
